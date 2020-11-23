@@ -1,6 +1,5 @@
-var incominglog = require("./services/logs/incomingLOG/writeIncomingLOG")
-var infolog = require("./services/logs/infoLOG/writeInfoLOG")
-var servicelog = require("./services/logs/servicesLOG/writeserviceLOG")
+var infolog = require("../logsService/infoLOG/writeInfoLOG")
+var servicelog = require("../logsService/servicesLOG/writeserviceLOG")
 const { MongoClient } = require("mongodb");
 
 //setting data base
@@ -12,7 +11,7 @@ var options = {
   useUnifiedTopology: true,
 };
 var logging3 = {
-  LOGTYPE: `INFO`,
+  LOGTYPE: `SERVICE`,
   RESPSTATUS: ``,
   RESPBODY: ``,
   CALL_SERVICE: ``,
@@ -23,6 +22,12 @@ var logging3 = {
   REQBODY: ``,
   SERVICES: ``,
   RESTIME: new Date().getTime(),
+};
+
+var responsevalue = {
+  resultCode: ``,
+  developerMessage: ``,
+  moreInfo: ``
 };
 function connect(query) {
   MongoClient.connect(databaseURL, options, (err, connector) => {
@@ -66,11 +71,12 @@ module.exports.exists = (find) => {
 
 module.exports.insert = function (data) {
   return new Promise((resolve, reject) => {
+    logging3.RESTIME = new Date().getTime()
     logging3.REQBODY = JSON.stringify({
       publicid: data.publicid,
       privateid2: data.privateid2,
     });
-    
+
     connect((connect, collection) => {
       collection.insertOne(data, function (err, result) {
         logging3.CALL_SERVICE = `INSERT_CUSTOMER`;
@@ -95,16 +101,21 @@ module.exports.insert = function (data) {
   });
 };
 
-module.exports.upsert = function (collection, data) {
+module.exports.upsert = function (data) {
   return new Promise((resolve, reject) => {
+    logging3.RESTIME = new Date().getTime()
     logging3.REQBODY = JSON.stringify({
       publicid: data.publicid,
       privateid2: data.privateid2,
     });
-    var query = data.publicid;
+    var publicid = data.publicid;
+    var update = {
+      privateid2: data.privateid2,
+      time: data.time
+    }
     var options = { upsert: true };
     connect((connect, collection) => {
-      collection.updateOne(query, data, options, function (err, result) {
+      collection.findOneAndUpdate({ publicid }, { $set: update }, options, function (err, result) {
         logging3.CALL_SERVICE = `UPDATE_CUSTOMER`;
         logging3.METHOD = `UPSERT`;
         if (err) {
@@ -113,10 +124,11 @@ module.exports.upsert = function (collection, data) {
           infolog.writen(logging3);
           reject(err);
         } else {
+          // console.log(`result: ${result}`);
           logging3.RESPSTATUS = "20000";
           logging3.RESPBODY = JSON.stringify({
-            insertedID: result.insertedId,
-            insertedCount: result.insertedCount,
+            updatedExisting: result.updatedExisting,
+            value: result.value,
           });
           servicelog.writen(logging3)
           resolve(result.insertedId);
@@ -126,10 +138,10 @@ module.exports.upsert = function (collection, data) {
     });
   });
 };
-// test
-// test 2
+
 module.exports.delete = function (find) {
   return new Promise((resolve, reject) => {
+    logging3.RESTIME = new Date().getTime()
     logging3.CALL_SERVICE = `DELETE_CUSTOMER`;
     logging3.METHOD = `DELETE`;
     logging3.REQBODY = `${JSON.stringify(find.publicid)}`;
@@ -138,17 +150,30 @@ module.exports.delete = function (find) {
         if (err) {
           logging3.RESPBODY = `${err}`;
           logging3.RESPSTATUS = `50000`;
+          responsevalue.resultCode = `50000`;
+          responsevalue.developerMessage = `${JSON.stringify(err)}`;
           infolog.writen(logging3);
-          reject(err);
+          reject(responsevalue);
         } else {
-          var deleted = result.deleteCount > 0;
-          logging3.RESPSTATUS = `20000`;
-          logging3.RESPBODY = `${JSON.stringify({
-            requestId: result.message.requestId,
-            deletetionValue: find.publicid,
-          })}`;
-          servicelog.writen(logging3)
-          resolve(deleted);
+          var deleted = JSON.stringify(result.deletedCount)
+          if (deleted != 0) {
+            logging3.RESPBODY = `${JSON.stringify({
+              requestId: result.message.requestId,
+              deletetionValue: find.publicid,
+            })}`;
+            servicelog.writen(logging3)
+            responsevalue.resultCode = `20000`;
+            responsevalue.developerMessage = `Success`;
+            resolve(responsevalue);
+          }
+          else if (deleted == 0) {
+            logging3.RESPSTATUS = `40401`;
+            logging3.RESPBODY = `Not Found Data`;
+            servicelog.writen(logging3)
+            responsevalue.resultCode = `40401`;
+            responsevalue.developerMessage = `Not Found Data`;
+            resolve(responsevalue);
+          }
         }
         connect.close();
       });
@@ -159,6 +184,7 @@ module.exports.delete = function (find) {
 
 module.exports.deletemany = function (find) {
   return new Promise((resolve, reject) => {
+    logging3.RESTIME = new Date().getTime()
     logging3.CALL_SERVICE = `DELETE_MANY_CUSTOMER`;
     logging3.METHOD = `DELETE`;
     logging3.REQBODY = `${JSON.stringify(find.publicid)}`;

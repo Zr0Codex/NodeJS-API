@@ -1,6 +1,6 @@
 {
   "name": "nodejs-api",
-  "version": "1.0.0",
+  "version": "2020-11-23",
   "description": "Auto-Create-Private-ADN",
   "main": "server.js",
   "scripts": {
@@ -47,6 +47,7 @@
     "schedule": "^0.5.0",
     "strict-transport-security": "^0.2.1",
     "time-stamp": "^2.2.0",
+    "underscore": "^1.11.0",
     "uuid": "^8.0.0",
     "uuid-v4": "^0.1.0",
     "winston": "^3.2.1",

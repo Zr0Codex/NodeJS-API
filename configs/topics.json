@@ -1,0 +1,37 @@
+{
+  "sffNewRegistration": {
+    "subscribeID": "sffNewRegistration",
+    "order_type": "New Registration",
+    "operation": "insert"
+  },
+  "sffReNew": {
+    "subscribeID": "sffReNew",
+    "order_type": "Re-New",
+    "operation": "insert"
+  },
+  "sffDisconnectCustomerRequest": {
+    "subscribeID": "sffDisconnectCustomerRequest",
+    "order_type": "Disconnect - Customer Request",
+    "operation": "delete"
+  },
+  "sffDisconnectTerminate": {
+    "subscribeID": "sffDisconnectTerminate",
+    "order_type": "Disconnect - Terminate",
+    "operation": "delete"
+  },
+  "sffPortOut": {
+    "subscribeID": "sffPortOut",
+    "order_type": "Port - Out",
+    "operation": "delete"
+  },
+  "sffChangeOwner": {
+    "subscribeID": "sffChangeOwner",
+    "order_type": "Change Owner",
+    "operation": "chown"
+  },
+  "sffChangeOwnerforSup": {
+    "subscribeID": "sffChangeOwnerforSup",
+    "order_type": "Change Owner for Sup",
+    "operation": "chown"
+  }
+}

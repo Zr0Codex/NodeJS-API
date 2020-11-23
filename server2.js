@@ -80,89 +80,293 @@ var corsOptions = {
 // test
 app.use(cors(corsOptions));
 
+// HP1 encoder //
+try {
+  // HP1 Encoder module
+  console.info("Init HP1 Module");
+  // Module builded
+  const HP1Module = "./extensions/aishp1/build/Release/hp1";
+  // Require HP1 Module
+  var encoder = require(HP1Module);
+  // Success
+  console.info(": Module loaded");
+} catch (e) {
+  // Error
+  console.error("Failed to load HP1 Module");
+}
+// HP1 encoder //
+
+
 // WRITE LOGS EVERY 15 MINS //
-var writeincoming15minsLOG = require("./services/logs/incomingLOG/writeIncoming15minsLOG")
+var writeincoming15minsLOG = require("./services/logsService/incomingLOG/writeIncoming15minsLOG")
 writeincoming15minsLOG.writeIncominglog15()
-var writeinfo15minsLOG = require("./services/logs/infoLOG/writeInfo15minsLOG")
+var writeinfo15minsLOG = require("./services/logsService/infoLOG/writeInfo15minsLOG")
 writeinfo15minsLOG.writeIncominglog15()
-var writeservice15minsLOG = require("./services/logs/servicesLOG/writeservice15minsLOG")
+var writeservice15minsLOG = require("./services/logsService/servicesLOG/writeservice15minsLOG")
 writeservice15minsLOG.writeIncominglog15()
 // WRITE LOGS EVERY 15 MINS //
 
-var incominglog = require("./services/logs/incomingLOG/writeIncomingLOG")
-var infolog = require("./services/logs/infoLOG/writeInfoLOG")
-var servicelog = require("./services/logs/servicesLOG/writeserviceLOG")
+var incominglog = require("./services/logsService/incomingLOG/writeIncomingLOG")
+var infolog = require("./services/logsService/infoLOG/writeInfoLOG")
+var servicelog = require("./services/logsService/servicesLOG/writeserviceLOG")
 
-const test = app.get("/test", (req, res) => {
-  var cutIp = JSON.stringify(req.ip);
-  // console.log(cutIp);
-  cutIp = cutIp.slice(1, -1);
-  // console.log(cutIp);
-  var uri = JSON.stringify(req.url);
-  uri = uri.slice(1, -1)
-  var logging = {
-    LOGTYPE: "INCOMING",
-    RESPSTATUS: "20000",
-    RESPBODY: "TEST",
-    CALL_SERVICE: "INCOMING",
-    METHOD: "GET",
-    IP: `${cutIp}`,
-    URI: uri,
+// function saved topic config //
+// read method
+const configPath = __dirname + "/configs";
+const dataPath = path.join(configPath, `topics.json`);
+const readFile = (
+  callback,
+  returnJson = false,
+  filePath = dataPath,
+  encoding = "utf8"
+) => {
+  fs.readFile(filePath, encoding, (err, data) => {
+    if (err) {
+      throw err;
+    }
+    callback(returnJson ? JSON.parse(data) : data);
+  });
+  // fs.close()
+};
+// write method
+const writeFile = (
+  fileData,
+  callback,
+  filePath = dataPath,
+  encoding = "utf8"
+) => {
+  fs.writeFile(filePath, fileData, encoding, (err) => {
+    if (err) {
+      throw err;
+    }
+    callback();
+  });
+  // fs.close();
+};
+// function saved topic config //
+
+
+const privateADN = app.post("/privateADN/receivetopic", (req, res) => {
+  var ip = req.headers["x-forwarded-for"] || req.connection.remoteAddress;
+  ip = ip.slice(7)
+  let payload = req.body;
+  var logging3 = {
+    LOGTYPE: `INCOMING`,
+    RESPSTATUS: `20000`,
+    RESPBODY: `${JSON.stringify(payload)}`,
+    CALL_SERVICE: `INCOMING_PAYLOADS`,
+    METHOD: `POST`,
+    IP: `${ip}`,
+    URI: `/privateADN/receivetopic`,
     REQHEADERS: ``,
-    REQBODY: `TEST`,
-    SERVICES: `TEST`,
+    REQBODY: ``,
+    SERVICES: ``,
     RESTIME: new Date().getTime(),
   };
+  incominglog.writen(logging3)
+  // console.log(JSON.stringify(payload));
+  if (
+    payload.hasOwnProperty("MSISDN") &&
+    payload.hasOwnProperty("ORDER_TYPE")
+  ) {
+    var msisdn = payload.MSISDN;
+    var orderType = payload.ORDER_TYPE;
+    var hp1 = encoder ? encoder.hp1(msisdn) : msisdn;
+    var loginb2b2c = require("./services/loginb2b2c/callLoginB2B2C")
+    loginb2b2c.loginb2b2c(hp1, orderType, msisdn).then((result) => {
+      res.send(result)
+    }).catch((err) => {
+      res.send(err)
+    })
+  }
+});
 
-  var logging2 = {
-    LOGTYPE: "INFO",
-    RESPSTATUS: "20000",
-    RESPBODY: "TEST",
-    CALL_SERVICE: "INFO",
-    METHOD: "GET",
-    IP: `${cutIp}`,
-    URI: uri,
-    REQHEADERS: ``,
-    REQBODY: `TEST`,
-    SERVICES: `TEST`,
-    RESTIME: new Date().getTime(),
+const subscribe = app.post("/aemf/subscribetopic", (req, res) => {
+  var topicID = req.body;
+  var response = {
+    resultCode: ``,
+    developerMessage: ``,
   };
 
   var logging3 = {
-    LOGTYPE: "SERVICE",
-    RESPSTATUS: "20000",
-    RESPBODY: "TEST",
-    CALL_SERVICE: "SERVICE",
-    METHOD: "GET",
-    IP: `${cutIp}`,
-    URI: uri,
+    LOGTYPE: `INFO`,
+    RESPSTATUS: ``,
+    RESPBODY: ``,
+    CALL_SERVICE: `SAVE_TOPIC`,
+    METHOD: ``,
+    IP: `${ip}`,
+    URI: ``,
     REQHEADERS: ``,
-    REQBODY: `TEST`,
-    SERVICES: `TEST`,
+    REQBODY: ``,
+    SERVICES: ``,
     RESTIME: new Date().getTime(),
   };
+  // this function to check empty or null valuea //
+  function checkProperties(obj) {
+    for (var key in obj) {
+      if (obj[key] == null || obj[key] == "") {
+        return true;
+      }
+    }
+    return false;
+  }
+  // this function to check empty or null valuea //
 
-  
-  incominglog.writen(logging);
-  infolog.writen(logging2);
-  servicelog.writen(logging3);
-  res.send("TEST")
-})
+  // this will checking request data from requester that value not null 
+  if (checkProperties(topicID) == false) {
 
-const sunscripbe = app.post("/aemf/subscribetopic", (req, res) => {
-  
-})
+    var ip = req.headers["x-forwarded-for"] || req.connection.remoteAddress;
+    ip = ip.slice(7)
+    // var infolog = require("./services/logsService/infoLOG/writeInfoLOG")
+    var subscribeID = req.body.subscribeID;
+    // function to call subscribe topic this will comment while running on locahost
+
+    logging3.IP = `${ip}`
+    readFile((data) => {
+      const topicId = req.body.subscribeID;
+      data[topicId.toString()] = req.body;
+      writeFile(JSON.stringify(data, null, 2), (err) => {
+        if (err) {
+          logging3.RESPSTATUS = `40400`;
+          logging3.RESPBODY = `not found file to save topic`;
+          infolog.writen(logging3)
+        }
+        logging3.RESPSTATUS = `20000`;
+        logging3.RESPBODY = `data saved at: ${dataPath}`;
+        infolog.writen(logging3)
+      });
+    }, true);
+    var subscribe = require("./services/topics/subscribe")
+    subscribe.subscribe(subscribeID, ip).then((result) => {
+      res.send(result);
+    }).catch((err) => {
+      res.send(err);
+    })
+  }
+  else {
+    response.resultCode = "40401";
+    response.developerMessage = "Missing or Invalid Parameter"
+    res.send(response)
+  }
+});
+
+const unsubscribe = app.post("/aemf/unsubscribetopic", (req, res) => {
+  var unsubscribetopic = require("./services/topics/unsubscribe")
+  var topicID = req.body;
+  var response = {
+    resultCode: ``,
+    developerMessage: ``,
+  };
+
+  var logging3 = {
+    LOGTYPE: `INFO`,
+    RESPSTATUS: ``,
+    RESPBODY: ``,
+    CALL_SERVICE: `DELETE_TOPIC`,
+    METHOD: ``,
+    IP: `${ip}`,
+    URI: ``,
+    REQHEADERS: ``,
+    REQBODY: ``,
+    SERVICES: ``,
+    RESTIME: new Date().getTime(),
+  };
+  // this function to check empty or null valuea //
+  function checkProperties(obj) {
+    for (var key in obj) {
+      if (obj[key] == null || obj[key] == "") {
+        return true;
+      }
+    }
+    return false;
+  }
+  // this function to check empty or null valuea //
+
+  // this will checking request data from requester that value not null 
+  if (checkProperties(topicID) == false) {
+
+    var ip = req.headers["x-forwarded-for"] || req.connection.remoteAddress;
+    ip = ip.slice(7)
+    var infolog = require("./services/logsService/infoLOG/writeInfoLOG")
+    var subscribeID = req.body.subscribeID;
+
+    // function to call subscribe topic this will comment while running on locahost
+    // unsubscribetopic.unsubscribe(subscribeID, ip); 
+
+    logging3.IP = `${ip}`
+    readFile((data) => {
+      const topicId = req.body.subscribeID;
+      data[topicId.toString()] = req.body;
+
+      var json = data;
+      var key = req.body.subscribeID;
+      delete json[key];
+
+      writeFile(JSON.stringify(json, null, 2), (err) => {
+        if (err) {
+          logging3.RESPSTATUS = `40400`;
+          logging3.RESPBODY = `not found file to save topic`;
+          infolog.writen(logging3)
+        }
+        logging3.RESPSTATUS = `20000`;
+        logging3.RESPBODY = `deleted data : ${dataPath}`;
+        infolog.writen(logging3)
+        // console.log(`deleted data from: ${dataPath}`);
+      });
+    }, true);
+    var unsubscribe = require("./services/topics/unsubscribe")
+    unsubscribe.unsubscribe(subscribeID, ip).then((result) => {
+      res.send(result);
+    }).catch((err) => {
+      res.send(err);
+    })
+  }
+  else {
+    response.resultCode = "40301";
+    response.developerMessage = "Missing or Invalid Parameter"
+    res.send(response)
+  }
+});
 
 
+if (process.env.NODE_ENV == 'macbookpro') {
+  var serverOptionsLocal = {
+    ciphers:
+      "ECDH+AESGCM:!ECDH+CHACHA20:ECDH+AES256:ECDH+AES128:!aNULL:!SHA1:!AESCCM",
+    honorCipherOrder: true,
+    secureProtocol: "TLSv1_2_method",
+  };
+  http.createServer(serverOptionsLocal, privateADN, subscribe, unsubscribe).listen(process.env.PORT, () => {
+    console.log(`app is run on port ${process.env.PORT}`);
+    console.log(`application is running at here`);
+  })
+}
+else if (process.env.NODE_ENV == 'development') {
+  var serverOptionsDev = {
+    key: fs.readFileSync(`${process.env.KEY}`),
+    cert: fs.readFileSync(`${process.env.CERT}`),
+    ciphers:
+      "ECDH+AESGCM:!ECDH+CHACHA20:ECDH+AES256:ECDH+AES128:!aNULL:!SHA1:!AESCCM",
+    honorCipherOrder: true,
+    secureProtocol: "TLSv1_2_method",
+  };
+  https.createServer(serverOptionsDev, privateADN, subscribe, unsubscribe).listen(process.env.PORT, () => {
+    console.log(`app is run on develop at port ${process.env.PORT}`);
+  })
+}
+else if (process.env.NODE_ENV == 'production') {
+  // console.log(JSON.stringify(process.env_development));
+  var serverOptionsProd = {
+    key: fs.readFileSync(`${process.env.KEY}`),
+    cert: fs.readFileSync(`${process.env.CERT}`),
+    ca: fs.readFileSync(`${process.env.CA}`),
+    ciphers:
+      "ECDH+AESGCM:!ECDH+CHACHA20:ECDH+AES256:ECDH+AES128:!aNULL:!SHA1:!AESCCM",
+    honorCipherOrder: true,
+    secureProtocol: "TLSv1_2_method",
+  };
+  https.createServer(serverOptionsProd, privateADN, subscribe, unsubscribe).listen(process.env.PORT, () => {
+    console.log(`app is run on port ${process.env.PORT}`);
+  })
+}
 
-var serverOptions = {
-  ciphers:
-    //"!RC4-SHA:!RC4:HIGH:!MD5:!aNULL:!EDH:!AESGCM:!eNULL:!EXPORT:!DEC:!PSK:!SRP:!CAMELLIA:!SHA1",
-    "ECDH+AESGCM:!ECDH+CHACHA20:ECDH+AES256:ECDH+AES128:!aNULL:!SHA1:!AESCCM",
-  honorCipherOrder: true,
-  secureProtocol: "TLSv1_2_method",
-};
-
-http.createServer(serverOptions, test).listen(process.env.PORT, () => {
-  console.log(`app is run on port ${process.env.PORT}`);
-})
