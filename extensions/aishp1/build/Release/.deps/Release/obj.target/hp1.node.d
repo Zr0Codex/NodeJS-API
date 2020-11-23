@@ -1,0 +1,1 @@
+cmd_Release/obj.target/hp1.node := g++ -shared -pthread -rdynamic -m64  -Wl,-soname=hp1.node -o Release/obj.target/hp1.node -Wl,--start-group Release/obj.target/hp1/src/hp1_node.o -Wl,--end-group -lssl -lcrypto -laiscrypto
